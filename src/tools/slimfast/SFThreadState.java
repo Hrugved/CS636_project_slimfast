@@ -7,7 +7,7 @@ public class SFThreadState {
 
     /* thread-specific metadata */
     public VectorClock CV;
-    public int E; // current epoch = CV[current tid]
+    public int E; // current epoch -> clock value = CV[current tid]
 
     /* other metadata for optimizations */
 
@@ -75,7 +75,7 @@ public class SFThreadState {
         return epcv;
     }
 
-    public void clear() {
+    public void refresh() {
         currentWriteEpoch=new EpochPair(true,E); // R->init, W->curr-thread-epoch
         for(int i=0;i<EpochPairCacheCurrentSize;i++) {
             EpochPairCache[i] = null;

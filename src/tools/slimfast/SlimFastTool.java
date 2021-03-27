@@ -80,17 +80,6 @@ import rr.tool.Tool;
 import tools.util.Epoch;
 import tools.util.VectorClock;
 
-/*
- * A revised FastTrack Tool. This makes several improvements over the original: - Simpler
- * synchronization scheme for VarStates. (The old optimistic scheme no longer has a performance
- * benefit and was hard to get right.) - Rephrased rules to: - include a Read-Shared-Same-Epoch
- * test. - eliminate an unnecessary update on joins (this was just for the proof). - remove the
- * Read-Shared to Exclusive transition. The last change makes the correctness argument easier and
- * that transition had little to no performance impact in practice. - Properly replays events when
- * the fast paths detect an error in all cases. - Supports long epochs for larger clock values. -
- * Handles tid reuse more precisely. The performance over the JavaGrande and DaCapo benchmarks is
- * more or less identical to the old implementation (within ~1% overall in our tests).
- */
 @Abbrev("SF")
 public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState> {
 
@@ -98,17 +87,12 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
     public static final int INIT_VECTOR_CLOCK_SIZE = 4;
 
     public final ErrorMessage<FieldInfo> fieldErrors = ErrorMessages
-            .makeFieldErrorMessage("FastTrack");
+            .makeFieldErrorMessage("SlimFast");
     public final ErrorMessage<ArrayAccessInfo> arrayErrors = ErrorMessages
-            .makeArrayErrorMessage("FastTrack");
+            .makeArrayErrorMessage("SlimFast");
 
-    private final VectorClock maxEpochPerTid = new VectorClock(INIT_VECTOR_CLOCK_SIZE);
-
-    // CS636: Every class object would have a vector clock. classInitTime is the Decoration which
-    // stores ClassInfo (as a key) and corresponding vector clock for that class (as a value).
-    // guarded by classInitTime
     public static final Decoration<ClassInfo, VectorClock> classInitTime = MetaDataInfoMaps
-            .getClasses().makeDecoration("FastTrack:ClassInitTime", Type.MULTIPLE,
+            .getClasses().makeDecoration("SlimFast:ClassInitTime", Type.MULTIPLE,
                     new DefaultValue<ClassInfo, VectorClock>() {
                         public VectorClock get(ClassInfo st) {
                             return new VectorClock(INIT_VECTOR_CLOCK_SIZE);
@@ -130,60 +114,45 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
         });
     }
 
-    /*
-     * Shadow State: St.E -- epoch decoration on ShadowThread - Thread-local. Never access from a
-     * different thread St.V -- VectorClock decoration on ShadowThread - Thread-local while thread
-     * is running. - The thread starting t may access st.V before the start. - Any thread joining on
-     * t may read st.V after the join. Sm.V -- FTLockState decoration on ShadowLock - See
-     * FTLockState for synchronization rules. Sx.R,Sx.W,Sx.V -- FTVarState objects - See FTVarState
-     * for synchronization rules. Svx.V -- FTVolatileState decoration on ShadowVolatile (serves same
-     * purpose as L for volatiles) - See FTVolatileState for synchronization rules. Sb.V --
-     * FTBarrierState decoration on Barriers - See FTBarrierState for synchronization rules.
-     */
-
-    // invariant: st.E == st.V(st.tid)
-    protected static int/* epoch */ ts_get_E(ShadowThread st) {
-        Assert.panic("Bad");
-        return -1;
-    }
-
-    protected static void ts_set_E(ShadowThread st, int/* epoch */ e) {
-        Assert.panic("Bad");
-    }
-
-    protected static VectorClock ts_get_V(ShadowThread st) {
+    protected static SFThreadState ts_get_sfts(ShadowThread st) {
         Assert.panic("Bad");
         return null;
     }
 
-    protected static void ts_set_V(ShadowThread st, VectorClock V) {
+    protected static void ts_set_sfts(ShadowThread st, SFThreadState sfts) {
         Assert.panic("Bad");
     }
 
     protected void maxAndIncEpochAndCV(ShadowThread st, VectorClock other, OperationInfo info) {
         final int tid = st.getTid();
-        final VectorClock tV = ts_get_V(st);
-        tV.max(other);
-        tV.tick(tid);
-        ts_set_E(st, tV.get(tid));
+        final SFThreadState sfts = ts_get_sfts(st);
+        sfts.CV.max(other);
+        sfts.CV.tick(tid);
+        Epoch.tick(sfts.E);
+        assert(Epoch.clock(sfts.E) ==  sfts.CV.get(tid)); ///
+        sfts.refresh();
     }
 
     protected void maxEpochAndCV(ShadowThread st, VectorClock other, OperationInfo info) {
         final int tid = st.getTid();
-        final VectorClock tV = ts_get_V(st);
-        tV.max(other);
-        ts_set_E(st, tV.get(tid));
+        final SFThreadState sfts = ts_get_sfts(st);
+        sfts.CV.max(other);
+        Epoch.tick(sfts.E);
+        assert(Epoch.clock(sfts.E) ==  sfts.CV.get(tid)); ///
+        sfts.refresh();
     }
 
     protected void incEpochAndCV(ShadowThread st, OperationInfo info) {
         final int tid = st.getTid();
-        final VectorClock tV = ts_get_V(st);
-        tV.tick(tid);
-        ts_set_E(st, tV.get(tid));
+        final SFThreadState sfts = ts_get_sfts(st);
+        sfts.CV.tick(tid);
+        Epoch.tick(sfts.E);
+        assert(Epoch.clock(sfts.E) ==  sfts.CV.get(tid)); ///
+        sfts.refresh();
     }
 
     static final Decoration<ShadowLock, SFLockState> lockVs = ShadowLock.makeDecoration(
-            "FastTrack:ShadowLock", DecorationFactory.Type.MULTIPLE,
+            "SlimFast:ShadowLock", DecorationFactory.Type.MULTIPLE,
             new DefaultValue<ShadowLock, SFLockState>() {
                 public SFLockState get(final ShadowLock lock) {
                     return new SFLockState(lock, INIT_VECTOR_CLOCK_SIZE);
@@ -196,7 +165,7 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
     }
 
     static final Decoration<ShadowVolatile, SFVolatileState> volatileVs = ShadowVolatile
-            .makeDecoration("FastTrack:shadowVolatile", DecorationFactory.Type.MULTIPLE,
+            .makeDecoration("SlimFast:shadowVolatile", DecorationFactory.Type.MULTIPLE,
                     new DefaultValue<ShadowVolatile, SFVolatileState>() {
                         public SFVolatileState get(final ShadowVolatile vol) {
                             return new SFVolatileState(vol, INIT_VECTOR_CLOCK_SIZE);
@@ -213,30 +182,32 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
         if (event.getKind() == Kind.VOLATILE) {
             final ShadowThread st = event.getThread();
             final VectorClock volV = getV(((VolatileAccessEvent) event).getShadowVolatile());
-            volV.max(ts_get_V(st));
+            volV.max(ts_get_sfts(st).CV);
             return super.makeShadowVar(event);
         } else {
-            return new SFVarState(event.isWrite(), ts_get_E(event.getThread()));
+//            return new SFVarState(event.isWrite(), ts_get_sfts(event.getThread()));
+            final ShadowThread st = event.getThread();
+            final SFThreadState sfts = ts_get_sfts(st);
+            if(event.isWrite()){
+                return sfts.getEpochPair(0, sfts.E); //
+            }else{
+                return sfts.getEpochPair(Epoch.clock(sfts.E), Epoch.make(st, 0));
+            }
         }
     }
 
     @Override
     public void create(NewThreadEvent event) {
         final ShadowThread st = event.getThread();
-
-        if (ts_get_V(st) == null) {
-            final int tid = st.getTid();
-            final VectorClock tV = new VectorClock(INIT_VECTOR_CLOCK_SIZE);
-            ts_set_V(st, tV);
-            synchronized (maxEpochPerTid) {
-                final int/* epoch */ epoch = maxEpochPerTid.get(tid) + 1;
-                tV.set(tid, epoch);
-                ts_set_E(st, epoch);
-            }
-            incEpochAndCV(st, null);
-            Util.log("Initial E for " + tid + ": " + Epoch.toString(ts_get_E(st)));
+        final int tid = st.getTid();
+        final SFThreadState sfts = new SFThreadState();
+        if(sfts.CV==null) {
+            sfts.CV = new VectorClock(INIT_VECTOR_CLOCK_SIZE);
+            sfts.CV.set(tid, 0);
+            sfts.E = Epoch.ZERO;
+            this.incEpochAndCV(st,null);
         }
-
+        Util.log("Initial E for " + tid + ": " + Epoch.toString(ts_get_sfts(st).E));
         super.create(event);
     }
 
@@ -255,7 +226,7 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
     @Override
     public void release(final ReleaseEvent event) {
         final ShadowThread st = event.getThread();
-        final VectorClock tV = ts_get_V(st);
+        final VectorClock tV = ts_get_sfts(st).CV;
         final VectorClock lockV = getV(event.getLock());
 
         lockV.max(tV);
@@ -377,7 +348,7 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
     }
 
     protected void read(final AccessEvent event, final ShadowThread st, final SFVarState sx) {
-        final int/* epoch */ e = ts_get_E(st);
+        final int/* epoch */ e = ts_get_sfts(st);
 
         /* optional */ {
             final int/* epoch */ r = sx.R;
@@ -430,68 +401,8 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
         }
     }
 
-    // CS636: Commented the method to prevent inlining of the read barrier
-    // public static boolean readFastPath(final ShadowVar shadow, final ShadowThread st) {
-    // if (shadow instanceof FTVarState) {
-    // final FTVarState sx = ((FTVarState) shadow);
-
-    // final int/* epoch */ e = ts_get_E(st);
-
-    // /* optional */ {
-    // final int/* epoch */ r = sx.R;
-    // if (r == e) {
-    // if (COUNT_OPERATIONS)
-    // readSameEpoch.inc(st.getTid());
-    // return true;
-    // } else if (r == Epoch.READ_SHARED && sx.get(st.getTid()) == e) {
-    // if (COUNT_OPERATIONS)
-    // readSharedSameEpoch.inc(st.getTid());
-    // return true;
-    // }
-    // }
-
-    // synchronized (sx) {
-    // final int tid = st.getTid();
-    // final VectorClock tV = ts_get_V(st);
-    // final int/* epoch */ r = sx.R;
-    // final int/* epoch */ w = sx.W;
-    // final int wTid = Epoch.tid(w);
-    // if (wTid != tid && !Epoch.leq(w, tV.get(wTid))) {
-    // ts_set_badVarState(st, sx);
-    // return false;
-    // }
-
-    // if (r != Epoch.READ_SHARED) {
-    // final int rTid = Epoch.tid(r);
-    // if (rTid == tid || Epoch.leq(r, tV.get(rTid))) {
-    // if (COUNT_OPERATIONS)
-    // readExclusive.inc(tid);
-    // sx.R = e;
-    // } else {
-    // if (COUNT_OPERATIONS)
-    // readShare.inc(tid);
-    // int initSize = Math.max(Math.max(rTid, tid), INIT_VECTOR_CLOCK_SIZE);
-    // sx.makeCV(initSize);
-    // sx.set(rTid, r);
-    // sx.set(tid, e);
-    // sx.R = Epoch.READ_SHARED;
-    // }
-    // } else {
-    // if (COUNT_OPERATIONS)
-    // readShared.inc(tid);
-    // sx.set(tid, e);
-    // }
-    // return true;
-    // }
-    // } else {
-    // return false;
-    // }
-    // }
-
-    /***/
-
     protected void write(final AccessEvent event, final ShadowThread st, final SFVarState sx) {
-        final int/* epoch */ e = ts_get_E(st);
+        final int/* epoch */ e = ts_get_sfts(st);
 
         /* optional */ {
             final int/* epoch */ w = sx.W;
@@ -543,68 +454,13 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
         }
     }
 
-    // CS636: Commented the method to prevent inlining of the read barrier
-    // only count events when returning true;
-    // public static boolean writeFastPath(final ShadowVar shadow, final ShadowThread st) {
-    // if (shadow instanceof FTVarState) {
-    // final FTVarState sx = ((FTVarState) shadow);
-
-    // final int/* epoch */ E = ts_get_E(st);
-
-    // /* optional */ {
-    // final int/* epoch */ w = sx.W;
-    // if (w == E) {
-    // if (COUNT_OPERATIONS)
-    // writeSameEpoch.inc(st.getTid());
-    // return true;
-    // }
-    // }
-
-    // synchronized (sx) {
-    // final int tid = st.getTid();
-    // final int/* epoch */ w = sx.W;
-    // final int wTid = Epoch.tid(w);
-    // final VectorClock tV = ts_get_V(st);
-
-    // if (wTid != tid && !Epoch.leq(w, tV.get(wTid))) {
-    // ts_set_badVarState(st, sx);
-    // return false;
-    // }
-
-    // final int/* epoch */ r = sx.R;
-    // if (r != Epoch.READ_SHARED) {
-    // final int rTid = Epoch.tid(r);
-    // if (rTid != tid && !Epoch.leq(r, tV.get(rTid))) {
-    // ts_set_badVarState(st, sx);
-    // return false;
-    // }
-    // if (COUNT_OPERATIONS)
-    // writeExclusive.inc(tid);
-    // } else {
-    // if (sx.anyGt(tV)) {
-    // ts_set_badVarState(st, sx);
-    // return false;
-    // }
-    // if (COUNT_OPERATIONS)
-    // writeShared.inc(tid);
-    // }
-    // sx.W = E;
-    // return true;
-    // }
-    // } else {
-    // return false;
-    // }
-    // }
-
-    /*****/
-
     @Override
     public void volatileAccess(final VolatileAccessEvent event) {
         final ShadowThread st = event.getThread();
         final VectorClock volV = getV((event).getShadowVolatile());
 
         if (event.isWrite()) {
-            final VectorClock tV = ts_get_V(st);
+            final VectorClock tV = ts_get_sfts(st).CV;
             volV.max(tV);
             incEpochAndCV(st, event.getAccessInfo());
         } else {
@@ -621,7 +477,7 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
     public void preStart(final StartEvent event) {
         final ShadowThread st = event.getThread();
         final ShadowThread su = event.getNewThread();
-        final VectorClock tV = ts_get_V(st);
+        final VectorClock tV = ts_get_sfts(st).CV;
 
         /*
          * Safe to access su.V, because u has not started yet. This will give us exclusive access to
@@ -639,9 +495,6 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
 
     @Override
     public void stop(ShadowThread st) {
-        synchronized (maxEpochPerTid) {
-            maxEpochPerTid.set(st.getTid(), ts_get_E(st));
-        }
         super.stop(st);
         if (COUNT_OPERATIONS)
             other.inc(st.getTid());
@@ -657,7 +510,7 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
         // lock is held and u is not running. Also, RR guarantees
         // this thread has sync'd with u.
 
-        maxEpochAndCV(st, ts_get_V(su), event.getInfo());
+        maxEpochAndCV(st, ts_get_sfts(su).CV, event.getInfo());
         // no need to inc su's clock here -- that was just for
         // the proof in the original FastTrack rules.
 
@@ -670,7 +523,7 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
     public void preWait(WaitEvent event) {
         final ShadowThread st = event.getThread();
         final VectorClock lockV = getV(event.getLock());
-        lockV.max(ts_get_V(st)); // we hold lock, so no need to sync here...
+        lockV.max(ts_get_sfts(st).CV); // we hold lock, so no need to sync here...
         incEpochAndCV(st, event.getInfo());
         super.preWait(event);
         if (COUNT_OPERATIONS)
@@ -688,8 +541,8 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
     }
 
     public static String toString(final ShadowThread td) {
-        return String.format("[tid=%-2d   C=%s   E=%s]", td.getTid(), ts_get_V(td),
-                Epoch.toString(ts_get_E(td)));
+        return String.format("[tid=%-2d   C=%s   E=%s]", td.getTid(), ts_get_sfts(td).CV,
+                Epoch.toString(ts_get_sfts(td).E));
     }
 
     private final Decoration<ShadowThread, VectorClock> vectorClockForBarrierEntry = ShadowThread
@@ -701,7 +554,7 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
         final SFBarrierState barrierObj = event.getBarrier();
         synchronized (barrierObj) {
             final VectorClock barrierV = barrierObj.enterBarrier();
-            barrierV.max(ts_get_V(st));
+            barrierV.max(ts_get_sfts(st).CV);
             vectorClockForBarrierEntry.set(st, barrierV);
         }
         if (COUNT_OPERATIONS)
@@ -725,7 +578,7 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
     @Override
     public void classInitialized(ClassInitializedEvent event) {
         final ShadowThread st = event.getThread();
-        final VectorClock tV = ts_get_V(st);
+        final VectorClock tV = ts_get_sfts(st).CV;
         synchronized (classInitTime) {
             VectorClock initTime = classInitTime.get(event.getRRClass());
             initTime.copy(tV);
