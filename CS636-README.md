@@ -22,7 +22,7 @@ Using the `rrun` script: `javac test/Test.java; rrrun -tool=FT2 -field=FINE -arr
 
 Without using the `rrrun` script: `javac test/Test.java; java -javaagent:$RR_HOME/build/jar/rragent.jar -Xmx3g -Xms1g -Xloggc:/dev/stdout -Xbootclasspath/p:$RR_HOME/classes:$RR_HOME/jars/java-cup-11a.jar: rr.RRMain -tool=FT2 -field=FINE -array=FINE -noTidGC -availableProcessors=4 test.Test`
 
-Provide the tool path: `java -javaagent:$RR_HOME/build/jar/rragent.jar -Xmx3g -Xms1g -Xloggc:/dev/stdout -Xbootclasspath/p:$RR_HOME/classes:$RR_HOME/jars/java-cup-11a.jar: rr.RRMain -tool=tools.fasttrack.FastTrackTool -field=FINE -array=FINE -noTidGC -availableProcessors=4 test.Test`
+Provide the tool path: `java -javaagent:$RR_HOME/build/jar/rragent.jar -Xmx3g -Xms1g -Xloggc:/dev/stdout -Xbootclasspath/p:$RR_HOME/classes:$RR_HOME/jars/java-cup-11a.jar: rr.RRMain -tool=tools.slimfast.FastTrackTool -field=FINE -array=FINE -noTidGC -availableProcessors=4 test.Test`
 
 You can create new microbenchmarks like `test/Test.java` and run RoadRunner analyses on them.
 

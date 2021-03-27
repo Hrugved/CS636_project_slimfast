@@ -30,52 +30,41 @@
  *
  ******************************************************************************/
 
-package tools.fasttrack;
+package tools.slimfast;
 
-import rr.state.ShadowVar;
-import tools.util.Epoch;
+import acme.util.Util;
 import tools.util.VectorClock;
 
-public class FTVarState extends VectorClock implements ShadowVar {
-    // inherited values field:
-    // * if R != SHARED, then values and values[*] are protected by this.
-    // * if R == SHARED, then:
-    // - values is write-protected by this;
-    // - values[i] is write-protected by this;
-    // - values[i] is only written thread i.
-    // - values[i] is only read without the lock by thread i.
-    // Thus, once we become SHARED, only thread i updates
-    // values[i] and only thread i reads values[i] without holding
-    // the lock, so no races exist due to program order.
+public class SFBarrierState {
 
-    // Write-protected by this => No concurrent writes when lock held.
-    public volatile int/* epoch */ W;
+    private final Object barrier;
 
-    // Write-protected by this => No concurrent writes when lock held.
-    // if R == Epoch.SHARED, it will never change again.
-    public volatile int/* epoch */ R;
+    // clock used to record the max of all threads upon entry
+    // the clock field is protected by this.
+    // barrier must be held when performing any operations on clock.
+    private VectorClock clock;
 
-    protected FTVarState() {
+    public SFBarrierState(Object k, int size) {
+        clock = new VectorClock(size);
+        barrier = k;
     }
 
-    public FTVarState(boolean isWrite, int/* epoch */ epoch) {
-        if (isWrite) {
-            R = Epoch.ZERO;
-            W = epoch;
-        } else {
-            W = Epoch.ZERO;
-            R = epoch;
+    /*
+     * Each thread should call this upon exiting the barrier. It ensure the barrier has created a
+     * new vector clock to use as threads enter during the next round.
+     */
+    public synchronized void stopUsingOldVectorClock(VectorClock old) {
+        if (clock == old) {
+            clock = new VectorClock(old.size());
         }
     }
 
-    @Override
-    public synchronized void makeCV(int len) {
-        super.makeCV(len);
+    public synchronized VectorClock enterBarrier() {
+        return clock;
     }
 
-    @Override
     public synchronized String toString() {
-        return String.format("[W=%s R=%s V=%s]", Epoch.toString(W), Epoch.toString(R),
-                super.toString());
+        return "[peer " + Util.objectToIdentityString(barrier) + ": " + clock + "]";
     }
+
 }

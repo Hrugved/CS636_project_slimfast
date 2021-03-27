@@ -30,20 +30,20 @@
  *
  ******************************************************************************/
 
-package tools.fasttrack;
+package tools.slimfast;
 
 import acme.util.Util;
 import rr.state.ShadowVolatile;
 import tools.util.VectorClock;
 
-public class FTVolatileState extends VectorClock {
+public class SFVolatileState extends VectorClock {
     // inherited values field: protected by peer.
     // RR ensures that peer is held when volatile access handler
     // is called.
 
     private final ShadowVolatile peer;
 
-    public FTVolatileState(ShadowVolatile peer, int size) {
+    public SFVolatileState(ShadowVolatile peer, int size) {
         super(size);
         this.peer = peer;
     }

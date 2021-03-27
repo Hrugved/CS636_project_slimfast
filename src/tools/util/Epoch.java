@@ -91,6 +91,10 @@ public final class Epoch {
         return clock(e1) <= clock(e2);
     }
 
+    public static boolean equals(int/* epoch */ e1, int/* epoch */ e2) {
+        return (tid(e1) == tid(e2)) && (clock(e1) == clock(e2));
+    }
+
     public static int/* epoch */ max(int/* epoch */ e1, int/* epoch */ e2) {
         // Assert.assertTrue(tid(e1) == tid(e2));
         return Epoch.make(tid(e1), Math.max(clock(e1), clock(e2)));
