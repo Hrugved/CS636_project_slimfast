@@ -204,7 +204,7 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
         if(sfts.CV==null) {
             sfts.CV = new VectorClock(INIT_VECTOR_CLOCK_SIZE);
             sfts.CV.set(tid, 0);
-            sfts.E = Epoch.ZERO;
+            sfts.E = Epoch.make(tid,0);
             this.incEpochAndCV(st,null);
         }
         Util.log("Initial E for " + tid + ": " + Epoch.toString(ts_get_sfts(st).E));
@@ -267,7 +267,7 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
                 ClassInfo owner = ((FieldAccessEvent) event).getInfo().getField().getOwner();
                 synchronized (classInitTime) {
                     VectorClock initTime = classInitTime.get(owner);
-                    maxEpochAndCV(st, initTime, event.getAccessInfo()); /
+                    maxEpochAndCV(st, initTime, event.getAccessInfo());
                 }
             }
             if (event.isWrite()) {
@@ -375,12 +375,14 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
                 } else {
                     if(!event.putShadow(sfts.getEpochPlusCV(sx,r,rTid))) {
                         event.putOriginalShadow(event.getShadow());
-                    };
+                    }
                 }
             } else {
                 if (COUNT_OPERATIONS)
                     readShared.inc(tid);
-                sx.set(tid, e);
+                if(!event.putShadow(((EpochPlusCV) sx).getNextEpcv(e))) {
+                    event.putOriginalShadow(event.getShadow());
+                }
             }
         }
     }
