@@ -23,4 +23,6 @@ public class EpochPair implements ShadowVar {
         W = Epoch.make(writeTid,writeClock);
     }
 
+    public EpochPair(){}
+
 }

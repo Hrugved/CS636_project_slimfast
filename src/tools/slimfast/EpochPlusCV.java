@@ -6,15 +6,15 @@ import tools.util.VectorClock;
 
 import java.util.ArrayList;
 
-public class EpochPlusCV extends VectorClock implements ShadowVar {
+public class EpochPlusCV extends EpochPair implements ShadowVar {
 
-    public volatile int W;
-    // R -> VectorClock
+    public volatile VectorClock RCV;
 
     ArrayList<EpochPlusCV> M[];
 
     public EpochPlusCV(int W) {
         this.W = W;
+        R = Epoch.READ_SHARED;
     }
 
 

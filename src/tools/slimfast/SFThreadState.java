@@ -22,7 +22,7 @@ public class SFThreadState {
     private final EpochPlusCV[] EpochPlusCVCache = new EpochPlusCV[EpochPlusCVCacheSize];
 
     // W_t
-    private EpochPair currentWriteEpoch;
+    public EpochPair currentWriteEpoch;
 
     public EpochPair getEpochPair(int readClock, int W) {
         EpochPair ep = getEpochPairFromCache(readClock,W);
@@ -31,7 +31,7 @@ public class SFThreadState {
         return ep; // READEXCLALLOC
     }
 
-    public EpochPair getEpochPairFromCache(int readClock, int W) {
+    public EpochPair getEpochPairFromCache(int readEpoch, int W) {
         for(int i=0;i<EpochPairCacheCurrentSize;i++) {
             if(Epoch.equals(EpochPairCache[i].W,W)) {
                 return EpochPairCache[i];
@@ -40,35 +40,35 @@ public class SFThreadState {
         return null;
     }
 
-    public EpochPair generateAndInsertNewEpochPairIntoCache(int readClock, int W) {
-        EpochPair ep = new EpochPair(Epoch.tid(W),readClock,Epoch.tid(W),Epoch.clock(W));
+    public EpochPair generateAndInsertNewEpochPairIntoCache(int readEpoch, int W) {
+        EpochPair ep = new EpochPair(Epoch.tid(W),Epoch.clock(readEpoch),Epoch.tid(W),Epoch.clock(W));
         if(EpochPairCacheCurrentSize<EpochPairCacheSize) EpochPairCacheCurrentSize++;
         // if overflow -> replace last entry
         EpochPairCache[EpochPairCacheCurrentSize-1]=ep;
         return ep;
     }
 
-    public EpochPlusCV getEpochPlusCV(EpochPair prevEpoch, int newReadClock, int newReadTid) {
-        EpochPlusCV ep = getEpochPlusCVFromCache(prevEpoch, newReadClock, newReadTid);
+    public EpochPlusCV getEpochPlusCV(EpochPair prevEpochPair, int newReadClock, int newReadTid) {
+        EpochPlusCV ep = getEpochPlusCVFromCache(prevEpochPair, newReadClock, newReadTid);
         if(ep!=null) return ep; // READINFLREUSE
-        ep = generateAndInsertNewEpochPlusCVIntoCache(prevEpoch, newReadClock, newReadTid);
+        ep = generateAndInsertNewEpochPlusCVIntoCache(prevEpochPair, newReadClock, newReadTid);
         return ep; // READINFLALLOC
     }
 
-    public EpochPlusCV getEpochPlusCVFromCache(EpochPair prevEpoch, int newReadClock, int newReadTid) {
+    public EpochPlusCV getEpochPlusCVFromCache(EpochPair prevEpochPair, int newReadClock, int newReadTid) {
         for(int i=0;i<EpochPlusCVCacheCurrentSize;i++) {
-            if((Epoch.equals(EpochPlusCVCache[i].W,prevEpoch.W)) && (EpochPlusCVCache[i].get(Epoch.tid(prevEpoch.R))==Epoch.clock(prevEpoch.R))) {
+            if((Epoch.equals(EpochPlusCVCache[i].W,prevEpochPair.W)) && (EpochPlusCVCache[i].RCV.get(Epoch.tid(prevEpochPair.R))==Epoch.clock(prevEpochPair.R))) {
                 return EpochPlusCVCache[i];
             }
         }
         return null;
     }
 
-    public EpochPlusCV generateAndInsertNewEpochPlusCVIntoCache(EpochPair prevEpoch, int newReadClock, int newReadTid) {
-        EpochPlusCV epcv = new EpochPlusCV(prevEpoch.W);
-        epcv.makeCV(SlimFastTool.INIT_VECTOR_CLOCK_SIZE);
-        epcv.set(Epoch.tid(prevEpoch.R),Epoch.clock(prevEpoch.R));
-        epcv.set(newReadTid,newReadClock);
+    public EpochPlusCV generateAndInsertNewEpochPlusCVIntoCache(EpochPair prevEpochPair, int newReadClock, int newReadTid) {
+        EpochPlusCV epcv = new EpochPlusCV(prevEpochPair.W);
+        epcv.RCV.makeCV(SlimFastTool.INIT_VECTOR_CLOCK_SIZE);
+        epcv.RCV.set(Epoch.tid(prevEpochPair.R),Epoch.clock(prevEpochPair.R));
+        epcv.RCV.set(newReadTid,newReadClock);
         if(EpochPlusCVCacheCurrentSize<EpochPlusCVCacheSize) EpochPlusCVCacheCurrentSize++;
         // if overflow -> replace last entry
         EpochPlusCVCache[EpochPlusCVCacheCurrentSize-1]=epcv;

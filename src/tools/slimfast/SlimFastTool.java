@@ -185,7 +185,7 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
             volV.max(ts_get_sfts(st).CV);
             return super.makeShadowVar(event);
         } else {
-//            return new SFVarState(event.isWrite(), ts_get_sfts(event.getThread()));
+//            return new EpochPair(event.isWrite(), ts_get_sfts(event.getThread()));
             final ShadowThread st = event.getThread();
             final SFThreadState sfts = ts_get_sfts(st);
             if(event.isWrite()){
@@ -237,17 +237,17 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
             release.inc(st.getTid());
     }
 
-    static SFVarState ts_get_badVarState(ShadowThread st) {
+    static EpochPair ts_get_badVarState(ShadowThread st) {
         Assert.panic("Bad");
         return null;
     }
 
-    static void ts_set_badVarState(ShadowThread st, SFVarState v) {
+    static void ts_set_badVarState(ShadowThread st, EpochPair v) {
         Assert.panic("Bad");
     }
 
     protected static ShadowVar getOriginalOrBad(ShadowVar original, ShadowThread st) {
-        final SFVarState savedState = ts_get_badVarState(st);
+        final EpochPair savedState = ts_get_badVarState(st);
         if (savedState != null) {
             ts_set_badVarState(st, null);
             return savedState;
@@ -258,32 +258,18 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
 
     @Override
     public void access(final AccessEvent event) {
-        SourceLocation sl = event.getAccessInfo().getLoc();
-        int line = sl.getLine();
-        int offset = sl.getOffset();
-        MethodInfo methInfo = sl.getMethod();
-        String methName = methInfo.getName();
-        ClassInfo className = methInfo.getOwner();
-        String desc = methInfo.getDescriptor();
-
         final ShadowThread st = event.getThread();
         final ShadowVar shadow = getOriginalOrBad(event.getOriginalShadow(), st);
-
-        if (shadow instanceof SFVarState) {
-            SFVarState sx = (SFVarState) shadow;
-
+        if (shadow instanceof EpochPair) {
+            EpochPair sx = (EpochPair) shadow;
             Object target = event.getTarget();
             if (target == null) {
-                // CS636: Static variable
                 ClassInfo owner = ((FieldAccessEvent) event).getInfo().getField().getOwner();
-                final VectorClock tV = ts_get_V(st);
                 synchronized (classInitTime) {
                     VectorClock initTime = classInitTime.get(owner);
-                    maxEpochAndCV(st, initTime, event.getAccessInfo()); // won't change current
-                                                                        // epoch
+                    maxEpochAndCV(st, initTime, event.getAccessInfo()); /
                 }
             }
-
             if (event.isWrite()) {
                 write(event, st, sx);
             } else {
@@ -347,16 +333,16 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
                 wait, vol, other);
     }
 
-    protected void read(final AccessEvent event, final ShadowThread st, final SFVarState sx) {
-        final int/* epoch */ e = ts_get_sfts(st);
+    protected void read(final AccessEvent event, final ShadowThread st, final EpochPair sx) {
+        final int e = ts_get_sfts(st).E;
 
-        /* optional */ {
+         {
             final int/* epoch */ r = sx.R;
             if (r == e) {
                 if (COUNT_OPERATIONS)
                     readSameEpoch.inc(st.getTid());
                 return;
-            } else if (r == Epoch.READ_SHARED && sx.get(st.getTid()) == e) {
+            } else if (r == Epoch.READ_SHARED && ((EpochPlusCV)(sx)).RCV.get(st.getTid()) == e) {
                 if (COUNT_OPERATIONS)
                     readSharedSameEpoch.inc(st.getTid());
                 return;
@@ -364,7 +350,8 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
         }
 
         synchronized (sx) {
-            final VectorClock tV = ts_get_V(st);
+             final SFThreadState sfts = ts_get_sfts(st);
+            final VectorClock tV = sfts.CV;
             final int/* epoch */ r = sx.R;
             final int/* epoch */ w = sx.W;
             final int wTid = Epoch.tid(w);
@@ -374,7 +361,6 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
                 if (COUNT_OPERATIONS)
                     writeReadError.inc(tid);
                 error(event, sx, "Write-Read Race", "Write by ", wTid, "Read by ", tid);
-                // best effort recovery:
                 return;
             }
 
@@ -383,15 +369,13 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
                 if (rTid == tid || Epoch.leq(r, tV.get(rTid))) {
                     if (COUNT_OPERATIONS)
                         readExclusive.inc(tid);
-                    sx.R = e;
+                    if(!event.putShadow(sfts.getEpochPair(sfts.E, sx.W))) {
+                        event.putOriginalShadow(event.getShadow());
+                    };
                 } else {
-                    if (COUNT_OPERATIONS)
-                        readShare.inc(tid);
-                    int initSize = Math.max(Math.max(rTid, tid), INIT_VECTOR_CLOCK_SIZE);
-                    sx.makeCV(initSize);
-                    sx.set(rTid, r);
-                    sx.set(tid, e);
-                    sx.R = Epoch.READ_SHARED;
+                    if(!event.putShadow(sfts.getEpochPlusCV(sx,r,rTid))) {
+                        event.putOriginalShadow(event.getShadow());
+                    };
                 }
             } else {
                 if (COUNT_OPERATIONS)
@@ -401,11 +385,11 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
         }
     }
 
-    protected void write(final AccessEvent event, final ShadowThread st, final SFVarState sx) {
-        final int/* epoch */ e = ts_get_sfts(st);
+    protected void write(final AccessEvent event, final ShadowThread st, final EpochPair sx) {
+        final int e = ts_get_sfts(st).E;
 
-        /* optional */ {
-            final int/* epoch */ w = sx.W;
+        {
+            final int w = sx.W;
             if (w == e) {
                 if (COUNT_OPERATIONS)
                     writeSameEpoch.inc(st.getTid());
@@ -414,21 +398,22 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
         }
 
         synchronized (sx) {
-            final int/* epoch */ w = sx.W;
+            final int w = sx.W;
             final int wTid = Epoch.tid(w);
             final int tid = st.getTid();
-            final VectorClock tV = ts_get_V(st);
+            final SFThreadState sfts = ts_get_sfts(st);
+            final VectorClock tV = sfts.CV;
 
-            if (wTid != tid /* optimization */ && !Epoch.leq(w, tV.get(wTid))) {
+            if (wTid != tid && !Epoch.leq(w, tV.get(wTid))) {
                 if (COUNT_OPERATIONS)
                     writeWriteError.inc(tid);
                 error(event, sx, "Write-Write Race", "Write by ", wTid, "Write by ", tid);
             }
 
-            final int/* epoch */ r = sx.R;
+            final int r = sx.R;
             if (r != Epoch.READ_SHARED) {
                 final int rTid = Epoch.tid(r);
-                if (rTid != tid /* optimization */ && !Epoch.leq(r, tV.get(rTid))) {
+                if (rTid != tid && !Epoch.leq(r, tV.get(rTid))) {
                     if (COUNT_OPERATIONS)
                         readWriteError.inc(tid);
                     error(event, sx, "Read-Write Race", "Read by ", rTid, "Write by ", tid);
@@ -437,8 +422,9 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
                         writeExclusive.inc(tid);
                 }
             } else {
-                if (sx.anyGt(tV)) {
-                    for (int prevReader = sx.nextGt(tV, 0); prevReader > -1; prevReader = sx
+                final EpochPlusCV sy = (EpochPlusCV) sx;
+                if (sy.RCV.anyGt(tV)) {
+                    for (int prevReader = sy.RCV.nextGt(tV, 0); prevReader > -1; prevReader = sy.RCV
                             .nextGt(tV, prevReader + 1)) {
                         error(event, sx, "Read(Shared)-Write Race", "Read by ", prevReader,
                                 "Write by ", tid);
@@ -450,7 +436,9 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
                         writeShared.inc(tid);
                 }
             }
-            sx.W = e;
+            if(!event.putShadow(sfts.currentWriteEpoch)) {
+                event.putOriginalShadow(event.getShadow());
+            };
         }
     }
 
@@ -607,7 +595,7 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
         }
     }
 
-    protected void error(final AccessEvent ae, final SFVarState x, final String description,
+    protected void error(final AccessEvent ae, final EpochPair x, final String description,
                          final String prevOp, final int prevTid, final String curOp, final int curTid) {
 
         if (ae instanceof FieldAccessEvent) {
@@ -617,7 +605,7 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
         }
     }
 
-    protected void arrayError(final ArrayAccessEvent aae, final SFVarState sx,
+    protected void arrayError(final ArrayAccessEvent aae, final EpochPair sx,
             final String description, final String prevOp, final int prevTid, final String curOp,
             final int curTid) {
         final ShadowThread st = aae.getThread();
@@ -640,7 +628,7 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
         }
     }
 
-    protected void fieldError(final FieldAccessEvent fae, final SFVarState sx,
+    protected void fieldError(final FieldAccessEvent fae, final EpochPair sx,
             final String description, final String prevOp, final int prevTid, final String curOp,
             final int curTid) {
         final FieldInfo fd = fae.getInfo().getField();
