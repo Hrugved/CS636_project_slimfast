@@ -6,7 +6,7 @@ import tools.util.VectorClock;
 public class SFThreadState {
 
     /* thread-specific metadata */
-    public VectorClock CV;
+    public VectorClock VC;
     public int E; // current epoch -> clock value = CV[current tid]
 
     /* other metadata for optimizations */
@@ -57,7 +57,7 @@ public class SFThreadState {
 
     public EpochPlusCV getEpochPlusCVFromCache(EpochPair prevEpochPair, int newReadClock, int newReadTid) {
         for(int i=0;i<EpochPlusCVCacheCurrentSize;i++) {
-            if((Epoch.equals(EpochPlusCVCache[i].W,prevEpochPair.W)) && (EpochPlusCVCache[i].RCV.get(Epoch.tid(prevEpochPair.R))==Epoch.clock(prevEpochPair.R))) {
+            if((Epoch.equals(EpochPlusCVCache[i].W,prevEpochPair.W)) && (EpochPlusCVCache[i].RVC.get(Epoch.tid(prevEpochPair.R))==Epoch.clock(prevEpochPair.R))) {
                 return EpochPlusCVCache[i];
             }
         }
@@ -66,9 +66,9 @@ public class SFThreadState {
 
     public EpochPlusCV generateAndInsertNewEpochPlusCVIntoCache(EpochPair prevEpochPair, int newReadClock, int newReadTid) {
         EpochPlusCV epcv = new EpochPlusCV(prevEpochPair.W);
-        epcv.RCV.makeCV(SlimFastTool.INIT_VECTOR_CLOCK_SIZE);
-        epcv.RCV.set(Epoch.tid(prevEpochPair.R),Epoch.clock(prevEpochPair.R));
-        epcv.RCV.set(newReadTid,newReadClock);
+        epcv.RVC.makeCV(SlimFastTool.INIT_VECTOR_CLOCK_SIZE);
+        epcv.RVC.set(Epoch.tid(prevEpochPair.R),Epoch.clock(prevEpochPair.R));
+        epcv.RVC.set(newReadTid,newReadClock);
         if(EpochPlusCVCacheCurrentSize<EpochPlusCVCacheSize) EpochPlusCVCacheCurrentSize++;
         // if overflow -> replace last entry
         EpochPlusCVCache[EpochPlusCVCacheCurrentSize-1]=epcv;
@@ -80,10 +80,10 @@ public class SFThreadState {
         for(int i=0;i<EpochPairCacheCurrentSize;i++) {
             EpochPairCache[i] = null;
         }
+        EpochPairCacheCurrentSize=0;
         for(int i=0;i<EpochPlusCVCacheCurrentSize;i++) {
             EpochPlusCVCache[i]=null;
         }
-        EpochPairCacheCurrentSize=0;
         EpochPlusCVCacheCurrentSize=0;
     }
 

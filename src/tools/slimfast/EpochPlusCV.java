@@ -8,7 +8,7 @@ import java.util.ArrayList;
 
 public class EpochPlusCV extends EpochPair implements ShadowVar {
 
-    public volatile VectorClock RCV;
+    public volatile VectorClock RVC; // read vector clock
 
     ArrayList<EpochPlusCV> next;
 
@@ -19,7 +19,7 @@ public class EpochPlusCV extends EpochPair implements ShadowVar {
 
     public EpochPlusCV(EpochPlusCV epcv) {
         this(epcv.W);
-        RCV.copy(epcv.RCV);
+        RVC.copy(epcv.RVC);
     }
 
     public EpochPlusCV getNextEpcv(int threadEpoch) {
@@ -28,7 +28,7 @@ public class EpochPlusCV extends EpochPair implements ShadowVar {
         EpochPlusCV epcv = next.get(tid);
         if(epcv==null) {
             epcv = new EpochPlusCV(this);
-            epcv.RCV.set(tid,clock);
+            epcv.RVC.set(tid,clock);
             next.set(tid,epcv);
         }
         return epcv;
