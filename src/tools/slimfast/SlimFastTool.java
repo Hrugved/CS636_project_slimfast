@@ -201,10 +201,11 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
         final ShadowThread st = event.getThread();
         final int tid = st.getTid();
         final SFThreadState sfts = new SFThreadState();
+        ts_set_sfts(st, sfts);
         if(sfts.VC==null) {
-            sfts.VC = new VectorClock(INIT_VECTOR_CLOCK_SIZE);
-            sfts.VC.set(tid, 0);
             sfts.E = Epoch.make(tid,0);
+            sfts.VC = new VectorClock(INIT_VECTOR_CLOCK_SIZE);
+            sfts.VC.set(tid, sfts.E);
             this.incEpochAndCV(st,null);
         }
         Util.log("Initial E for " + tid + ": " + Epoch.toString(ts_get_sfts(st).E));
