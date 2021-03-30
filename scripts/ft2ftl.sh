@@ -43,7 +43,7 @@
 # CS636: Edited to take care of whitespace
 
 mkdir -p auto/tools/fasttrack_long
-cp src/tools/fasttrack/*.java auto/tools/fasttrack_long/
+cp src/tools/tools.fasttrack/*.java auto/tools/fasttrack_long/
 sed -i.bak -e "s/int\/\* epoch \*\//long\/* epoch *\//g" auto/tools/fasttrack_long/*.java
 sed -i.bak -e "s/VectorClock/LongVectorClock/g" auto/tools/fasttrack_long/*.java
 sed -i.bak -e "s/Epoch/LongEpoch/g" auto/tools/fasttrack_long/*.java

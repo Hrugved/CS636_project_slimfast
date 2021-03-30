@@ -1,12 +1,13 @@
 package tools.slimfast;
 
+import acme.util.Assert;
 import tools.util.Epoch;
 import tools.util.VectorClock;
 
 public class SFThreadState {
 
     /* thread-specific metadata */
-    public VectorClock VC;
+    public VectorClock VC = new VectorClock(SlimFastTool.INIT_VECTOR_CLOCK_SIZE);
     public int E; // current epoch -> clock value = CV[current tid]
 
     /* other metadata for optimizations */
@@ -66,7 +67,6 @@ public class SFThreadState {
 
     public EpochPlusCV generateAndInsertNewEpochPlusCVIntoCache(EpochPair prevEpochPair, int newReadClock, int newReadTid) {
         EpochPlusCV epcv = new EpochPlusCV(prevEpochPair.W);
-        epcv.RVC.makeCV(SlimFastTool.INIT_VECTOR_CLOCK_SIZE);
         epcv.RVC.set(Epoch.tid(prevEpochPair.R),Epoch.clock(prevEpochPair.R));
         epcv.RVC.set(newReadTid,newReadClock);
         if(EpochPlusCVCacheCurrentSize<EpochPlusCVCacheSize) EpochPlusCVCacheCurrentSize++;
