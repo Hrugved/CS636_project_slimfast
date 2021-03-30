@@ -131,7 +131,7 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
         sfts.VC.tick(tid);
         sfts.E = sfts.VC.get(tid);
 //        System.out.println("inc: "+toString(st)+" isequal"+Epoch.equals(sfts.E,sfts.VC.get(tid)));
-        Assert.assertTrue(Epoch.equals(sfts.E,sfts.VC.get(tid))); ///
+        Assert.assertTrue(sfts.E==sfts.VC.get(tid)); ///
         sfts.refresh();
     }
 
@@ -140,7 +140,7 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
         final SFThreadState sfts = ts_get_sfts(st);
         sfts.VC.max(other);
         sfts.E = sfts.VC.get(tid);
-        Assert.assertTrue(Epoch.equals(sfts.E,sfts.VC.get(tid))); ///
+        Assert.assertTrue(sfts.E==sfts.VC.get(tid)); ///
 //        System.out.println("inc: "+toString(st)+" isequal"+Epoch.equals(sfts.E,sfts.VC.get(tid)));
         sfts.refresh();
     }
@@ -152,7 +152,7 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
         sfts.VC.tick(tid);
         sfts.E = sfts.VC.get(tid);
 //        System.out.println("inc: "+toString(st)+" isequal"+Epoch.equals(sfts.E,sfts.VC.get(tid)));
-        Assert.assertTrue(Epoch.equals(sfts.E,sfts.VC.get(tid))); ///
+        Assert.assertTrue(sfts.E==sfts.VC.get(tid)); ///
         sfts.refresh();
     }
 
@@ -369,7 +369,7 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
             final int/* epoch */ w = sx.W;
             final int wTid = Epoch.tid(w);
             final int tid = st.getTid();
-            Assert.assertTrue(Epoch.equals(sfts.E,sfts.VC.get(tid))); ///
+            Assert.assertTrue(sfts.E==sfts.VC.get(tid)); ///
 
 //            System.out.println(toString(st));
 
@@ -401,7 +401,7 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
                     event.putOriginalShadow(event.getShadow());
                 }
             }
-            Assert.assertTrue(Epoch.equals(sfts.E,sfts.VC.get(tid))); ///
+            Assert.assertTrue(sfts.E==sfts.VC.get(tid)); ///
 
         }
 //        System.out.println(toString(st));
@@ -430,7 +430,7 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
             final int tid = st.getTid();
             final SFThreadState sfts = ts_get_sfts(st);
             final VectorClock tV = sfts.VC;
-            Assert.assertTrue(Epoch.equals(sfts.E,sfts.VC.get(tid))); ///
+            Assert.assertTrue(sfts.E==sfts.VC.get(tid)); ///
 
 //            System.out.println(toString(st));
 
@@ -469,7 +469,7 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
             if(!event.putShadow(sfts.currentWriteEpoch)) {
                 event.putOriginalShadow(event.getShadow());
             }
-            Assert.assertTrue(Epoch.equals(sfts.E,sfts.VC.get(tid))); ///
+            Assert.assertTrue(sfts.E==sfts.VC.get(tid)); ///
 
         }
 

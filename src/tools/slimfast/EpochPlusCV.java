@@ -5,12 +5,14 @@ import tools.util.Epoch;
 import tools.util.VectorClock;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 
 public class EpochPlusCV extends EpochPair implements ShadowVar {
 
-    public volatile VectorClock RVC; // read vector clock
+    public volatile VectorClock RVC = new VectorClock(SlimFastTool.INIT_VECTOR_CLOCK_SIZE);;
 
-    ArrayList<EpochPlusCV> next;
+    HashMap<Integer,EpochPlusCV> next = new HashMap<>();
 
     public EpochPlusCV(int W) {
         this.W = W;
@@ -24,12 +26,11 @@ public class EpochPlusCV extends EpochPair implements ShadowVar {
 
     public EpochPlusCV getNextEpcv(int threadEpoch) {
         int tid = Epoch.tid(threadEpoch);
-        int clock = Epoch.clock(threadEpoch);
         EpochPlusCV epcv = next.get(tid);
         if(epcv==null) {
             epcv = new EpochPlusCV(this);
-            epcv.RVC.set(tid,clock);
-            next.set(tid,epcv);
+            epcv.RVC.set(tid,threadEpoch);
+            next.put(tid,epcv);
         }
         return epcv;
     }
