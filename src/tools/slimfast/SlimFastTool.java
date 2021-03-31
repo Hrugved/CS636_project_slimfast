@@ -83,6 +83,9 @@ import tools.util.VectorClock;
 @Abbrev("SF")
 public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState> {
 
+    public static final String YELLOW = "\033[0;33m";  // YELLOW
+    public static final String RESET = "\033[0m";  // Text Reset
+
     private static final boolean COUNT_OPERATIONS = RRMain.slowMode();
     public static final int INIT_VECTOR_CLOCK_SIZE = 4;
 
@@ -138,11 +141,13 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
     protected void maxEpochAndCV(ShadowThread st, VectorClock other, OperationInfo info) {
         final int tid = st.getTid();
         final SFThreadState sfts = ts_get_sfts(st);
+        int pe = sfts.E;
         sfts.VC.max(other);
         sfts.E = sfts.VC.get(tid);
         Assert.assertTrue(sfts.E==sfts.VC.get(tid)); ///
+        Assert.assertTrue(sfts.E==pe);
 //        System.out.println("inc: "+toString(st)+" isequal"+Epoch.equals(sfts.E,sfts.VC.get(tid)));
-        sfts.refresh();
+//        sfts.refresh();
     }
 
     protected void incEpochAndCV(ShadowThread st, OperationInfo info) {
@@ -195,28 +200,32 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
             final SFThreadState sfts = ts_get_sfts(st);
             if(event.isWrite()){
 //                return sfts.getEpochPair(0, sfts.E);
-                return sfts.getEpochPair(Epoch.clock(sfts.E), sfts.E); //
+                return sfts.getEpochPair(sfts.E, sfts.E); //
             }else{
 //                return sfts.getEpochPair(Epoch.clock(sfts.E), Epoch.make(st, 0));
-                return sfts.getEpochPair(Epoch.clock(sfts.E), Epoch.make(st, 0));
+                return sfts.getEpochPair(sfts.E, Epoch.make(st, 0));
             }
         }
     }
 
     @Override
     public void create(NewThreadEvent event) {
+
+
         final ShadowThread st = event.getThread();
         final int tid = st.getTid();
+        System.out.println(YELLOW + "Thread created" + tid +RESET);
         final SFThreadState sfts = new SFThreadState();
         ts_set_sfts(st, sfts);
-        if(sfts.VC==null) {
+//        if(sfts.VC==null) {
             sfts.E = Epoch.make(tid,0);
             sfts.VC.set(tid, sfts.E);
             this.incEpochAndCV(st,null);
-        }
+//        }
         Util.log("Initial E for " + tid + ": " + Epoch.toString(ts_get_sfts(st).E));
-
-        System.out.println(toString(st));
+//        System.out.println("Initial E for " + tid + ": " + Epoch.toString(ts_get_sfts(st).E));
+        System.out.println(YELLOW+toString(st)+RESET);
+//        System.out.println(YELLOW++RESET);
 
         super.create(event);
     }
@@ -355,7 +364,7 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
                 if (COUNT_OPERATIONS)
                     readSameEpoch.inc(st.getTid());
                 return;
-            } else if (r == Epoch.READ_SHARED && ((EpochPlusCV)(sx)).RVC.get(st.getTid()) == e) {
+            } else if ((r == Epoch.READ_SHARED) && (((EpochPlusCV)(sx)).RVC.get(st.getTid()) == e)) {
                 if (COUNT_OPERATIONS)
                     readSharedSameEpoch.inc(st.getTid());
                 return;
@@ -363,7 +372,7 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
         }
 
         synchronized (sx) {
-             final SFThreadState sfts = ts_get_sfts(st);
+            final SFThreadState sfts = ts_get_sfts(st);
             final VectorClock tV = sfts.VC;
             final int/* epoch */ r = sx.R;
             final int/* epoch */ w = sx.W;
@@ -386,18 +395,18 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
                 if (rTid == tid || Epoch.leq(r, tV.get(rTid))) {
                     if (COUNT_OPERATIONS)
                         readExclusive.inc(tid);
-                    if(!event.putShadow(sfts.getEpochPair(sfts.E, sx.W))) {
+                    while(!event.putShadow(sfts.getEpochPair(sfts.E, sx.W))) {
                         event.putOriginalShadow(event.getShadow());
                     };
                 } else {
-                    if(!event.putShadow(sfts.getEpochPlusCV(sx,r,rTid))) {
+                    while(!event.putShadow(sfts.getEpochPlusCV(sx,r,rTid))) {
                         event.putOriginalShadow(event.getShadow());
                     }
                 }
             } else {
                 if (COUNT_OPERATIONS)
                     readShared.inc(tid);
-                if(!event.putShadow(((EpochPlusCV) sx).getNextEpcv(e))) {
+                while(!event.putShadow(((EpochPlusCV) sx).getNextEpcv(e))) {
                     event.putOriginalShadow(event.getShadow());
                 }
             }
@@ -456,8 +465,10 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
                 if (sy.RVC.anyGt(tV)) {
                     for (int prevReader = sy.RVC.nextGt(tV, 0); prevReader > -1; prevReader = sy.RVC
                             .nextGt(tV, prevReader + 1)) {
-                        error(event, sx, "Read(Shared)-Write Race", "Read by ", prevReader,
-                                "Write by ", tid);
+                        if (prevReader != tid) {
+                            error(event, sx, "Read(Shared)-Write Race", "Read by ", prevReader,
+                                    "Write by ", tid);
+                        }
                     }
                     if (COUNT_OPERATIONS)
                         sharedWriteError.inc(tid);
@@ -466,7 +477,7 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
                         writeShared.inc(tid);
                 }
             }
-            if(!event.putShadow(sfts.currentWriteEpoch)) {
+            while(!event.putShadow(sfts.currentWriteEpoch)) {
                 event.putOriginalShadow(event.getShadow());
             }
             Assert.assertTrue(sfts.E==sfts.VC.get(tid)); ///
@@ -684,3 +695,141 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
         }
     }
 }
+
+
+
+//    protected void read(final AccessEvent event, final ShadowThread st, final EpochPair sx) {
+//
+////        System.out.println(toString(st));
+//
+//        final int e = ts_get_sfts(st).E;
+//
+//        {
+//            final int/* epoch */ r = sx.R;
+//            if (r == e) {
+//                if (COUNT_OPERATIONS)
+//                    readSameEpoch.inc(st.getTid());
+//                return;
+//            } else if ((r == Epoch.READ_SHARED) && (((EpochPlusCV)(sx)).RVC.get(st.getTid()) == e)) {
+//                if (COUNT_OPERATIONS)
+//                    readSharedSameEpoch.inc(st.getTid());
+//                return;
+//            }
+//        }
+//
+//        synchronized (sx) {
+//            final SFThreadState sfts = ts_get_sfts(st);
+//            final VectorClock tV = sfts.VC;
+//            final int/* epoch */ r = sx.R;
+//            final int/* epoch */ w = sx.W;
+//            final int wTid = Epoch.tid(w);
+//            final int tid = st.getTid();
+//            Assert.assertTrue(sfts.E==sfts.VC.get(tid)); ///
+//
+////            System.out.println(toString(st));
+//
+//
+//            if (wTid != tid && !Epoch.leq(w, tV.get(wTid))) {
+//                if (COUNT_OPERATIONS)
+//                    writeReadError.inc(tid);
+//                error(event, sx, "Write-Read Race", "Write by ", wTid, "Read by ", tid);
+//                return;
+//            }
+//
+//            if (r != Epoch.READ_SHARED) {
+//                final int rTid = Epoch.tid(r);
+//                if (rTid == tid || Epoch.leq(r, tV.get(rTid))) {
+//                    if (COUNT_OPERATIONS)
+//                        readExclusive.inc(tid);
+//                    while(!event.putShadow(sfts.getEpochPair(sfts.E, sx.W))) {
+//                        event.putOriginalShadow(event.getShadow());
+//                    };
+//                } else {
+//                    while(!event.putShadow(sfts.getEpochPlusCV(sx,r,rTid))) {
+//                        event.putOriginalShadow(event.getShadow());
+//                    }
+//                }
+//            } else {
+//                if (COUNT_OPERATIONS)
+//                    readShared.inc(tid);
+//                while(!event.putShadow(((EpochPlusCV) sx).getNextEpcv(e))) {
+//                    event.putOriginalShadow(event.getShadow());
+//                }
+//            }
+//            Assert.assertTrue(sfts.E==sfts.VC.get(tid)); ///
+//
+//        }
+////        System.out.println(toString(st));
+//
+//
+//    }
+//
+//    protected void write(final AccessEvent event, final ShadowThread st, final EpochPair sx) {
+//
+////        System.out.println(toString(st));
+//        final int e = ts_get_sfts(st).E;
+//
+//        {
+//            final int w = sx.W;
+//            if (w == e) {
+//                if (COUNT_OPERATIONS)
+//                    writeSameEpoch.inc(st.getTid());
+//                return;
+//            }
+//        }
+//
+//        synchronized (sx) {
+//
+//            final int w = sx.W;
+//            final int wTid = Epoch.tid(w);
+//            final int tid = st.getTid();
+//            final SFThreadState sfts = ts_get_sfts(st);
+//            final VectorClock tV = sfts.VC;
+//            Assert.assertTrue(sfts.E==sfts.VC.get(tid)); ///
+//
+////            System.out.println(toString(st));
+//
+//            if (wTid != tid && !Epoch.leq(w, tV.get(wTid))) {
+//                if (COUNT_OPERATIONS)
+//                    writeWriteError.inc(tid);
+//                error(event, sx, "Write-Write Race", "Write by ", wTid, "Write by ", tid);
+//            }
+//
+//            final int r = sx.R;
+//            if (r != Epoch.READ_SHARED) {
+//                final int rTid = Epoch.tid(r);
+//                if (rTid != tid && !Epoch.leq(r, tV.get(rTid))) {
+//                    if (COUNT_OPERATIONS)
+//                        readWriteError.inc(tid);
+//                    error(event, sx, "Read-Write Race", "Read by ", rTid, "Write by ", tid);
+//                } else {
+//                    if (COUNT_OPERATIONS)
+//                        writeExclusive.inc(tid);
+//                }
+//            } else {
+//                final EpochPlusCV sy = (EpochPlusCV) sx;
+//                if (sy.RVC.anyGt(tV)) {
+//                    for (int prevReader = sy.RVC.nextGt(tV, 0); prevReader > -1; prevReader = sy.RVC
+//                            .nextGt(tV, prevReader + 1)) {
+//                        if (prevReader != tid) {
+//                            error(event, sx, "Read(Shared)-Write Race", "Read by ", prevReader,
+//                                    "Write by ", tid);
+//                        }
+//                    }
+//                    if (COUNT_OPERATIONS)
+//                        sharedWriteError.inc(tid);
+//                } else {
+//                    if (COUNT_OPERATIONS)
+//                        writeShared.inc(tid);
+//                }
+//            }
+//            while(!event.putShadow(sfts.currentWriteEpoch)) {
+//                event.putOriginalShadow(event.getShadow());
+//            }
+//            Assert.assertTrue(sfts.E==sfts.VC.get(tid)); ///
+//
+//        }
+//
+////        System.out.println(toString(st));
+//
+//    }

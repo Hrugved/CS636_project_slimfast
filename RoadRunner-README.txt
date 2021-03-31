@@ -38,7 +38,7 @@ Notes on Major Updates
   * Version 0.5:
 
   	New FastTrack implementation. See
-  	tools/fasttrack/FastTrackTool and the tech report at
+  	tools/tools.fasttrack/FastTrackTool and the tech report at
   	http://dept.cs.williams.edu/~freund/papers/ft2-techreport.pdf
   	for details.
 

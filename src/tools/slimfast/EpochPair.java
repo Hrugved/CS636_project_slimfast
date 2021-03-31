@@ -5,17 +5,12 @@ import tools.util.Epoch;
 
 public class EpochPair implements ShadowVar {
 
-    public volatile int R;
-    public volatile int W;
+    public volatile int/* epoch */ R;
+    public volatile int/* epoch */ W;
 
-    public EpochPair(boolean isWrite, int/* epoch */ epoch) {
-        if (isWrite) {
-            R = Epoch.ZERO;
-            W = epoch;
-        } else {
-            W = Epoch.ZERO;
-            R = epoch;
-        }
+    public EpochPair(int/* epoch */ readEpoch, int/* epoch */ writeEpoch) {
+        R = readEpoch;
+        W = writeEpoch;
     }
 
     public EpochPair(int readTid, int readClock, int writeTid, int writeClock) {

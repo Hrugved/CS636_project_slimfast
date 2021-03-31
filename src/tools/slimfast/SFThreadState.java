@@ -8,7 +8,7 @@ public class SFThreadState {
 
     /* thread-specific metadata */
     public VectorClock VC = new VectorClock(SlimFastTool.INIT_VECTOR_CLOCK_SIZE);
-    public int E; // current epoch -> clock value = CV[current tid]
+    public int/* epoch */ E; // current epoch = VC[self tid]
 
     /* other metadata for optimizations */
 
@@ -25,14 +25,14 @@ public class SFThreadState {
     // W_t
     public EpochPair currentWriteEpoch;
 
-    public EpochPair getEpochPair(int readClock, int W) {
-        EpochPair ep = getEpochPairFromCache(readClock,W);
+    public EpochPair getEpochPair(int/* epoch */ R, int/* epoch */ W) {
+        EpochPair ep = getEpochPairFromCache(R,W);
         if(ep!=null) return ep; // READEXCLREUSE
-        ep = generateAndInsertNewEpochPairIntoCache(readClock,W);
+        ep = generateAndInsertNewEpochPairIntoCache(R,W);
         return ep; // READEXCLALLOC
     }
 
-    public EpochPair getEpochPairFromCache(int readEpoch, int W) {
+    public EpochPair getEpochPairFromCache(int/* epoch */ R, int/* epoch */ W) {
         for(int i=0;i<EpochPairCacheCurrentSize;i++) {
             if(EpochPairCache[i].W==W) {
                 return EpochPairCache[i];
@@ -41,8 +41,8 @@ public class SFThreadState {
         return null;
     }
 
-    public EpochPair generateAndInsertNewEpochPairIntoCache(int readEpoch, int W) {
-        EpochPair ep = new EpochPair(Epoch.tid(W),Epoch.clock(readEpoch),Epoch.tid(W),Epoch.clock(W));
+    public EpochPair generateAndInsertNewEpochPairIntoCache(int/* epoch */ R, int/* epoch */ W) {
+        EpochPair ep = new EpochPair(Epoch.tid(E),Epoch.clock(R),Epoch.tid(W),Epoch.clock(W));
         if(EpochPairCacheCurrentSize<EpochPairCacheSize) EpochPairCacheCurrentSize++;
         // if overflow -> replace last entry
         EpochPairCache[EpochPairCacheCurrentSize-1]=ep;
@@ -76,7 +76,8 @@ public class SFThreadState {
     }
 
     public void refresh() {
-        currentWriteEpoch=new EpochPair(true,E); // R->init, W->curr-thread-epoch
+//        currentWriteEpoch=new EpochPair(true,E); // R->init, W->curr-thread-epoch
+        currentWriteEpoch=new EpochPair(E,E); // R->init, W->curr-thread-epoch
         for(int i=0;i<EpochPairCacheCurrentSize;i++) {
             EpochPairCache[i] = null;
         }
