@@ -14,10 +14,11 @@ public class EpochPair implements ShadowVar {
     }
 
     public EpochPair(int readTid, int readClock, int writeTid, int writeClock) {
-        R = Epoch.make(readTid,readClock);
-        W = Epoch.make(writeTid,writeClock);
+        R = Epoch.make(readTid, readClock);
+        W = Epoch.make(writeTid, writeClock);
     }
 
-    public EpochPair(){}
+    public EpochPair() {
+    }
 
 }
