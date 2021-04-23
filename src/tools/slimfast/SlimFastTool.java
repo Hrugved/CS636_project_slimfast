@@ -331,7 +331,12 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
     }
 
     protected void read(final AccessEvent event, final ShadowThread st, final EpochPair sx) {
+        while(!try_read(event,st,sx)) {
+            event.putOriginalShadow(event.getShadow());
+        }
+    }
 
+    protected boolean try_read(final AccessEvent event, final ShadowThread st, final EpochPair sx) {
 
         final int e = ts_get_sfts(st).E;
 
@@ -340,11 +345,11 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
             if (r == e) {
                 if (COUNT_OPERATIONS)
                     readSameEpoch.inc(st.getTid());
-                return;
+                return true;
             } else if ((r == Epoch.READ_SHARED) && (((EpochPlusCV) (sx)).RVC.get(st.getTid()) == e)) {
                 if (COUNT_OPERATIONS)
                     readSharedSameEpoch.inc(st.getTid());
-                return;
+                return true;
             }
         }
 
@@ -361,7 +366,7 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
                 if (COUNT_OPERATIONS)
                     writeReadError.inc(tid);
                 error(event, sx, "Write-Read Race", "Write by ", wTid, "Read by ", tid);
-                return;
+                return true;
             }
 
             if (r != Epoch.READ_SHARED) {
@@ -369,29 +374,28 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
                 if (rTid == tid || Epoch.leq(r, tV.get(rTid))) {
                     if (COUNT_OPERATIONS)
                         readExclusive.inc(tid);
-                    while (!event.putShadow(sfts.getEpochPair(sfts.E, sx.W))) {
-                        event.putOriginalShadow(event.getShadow());
-                    }
-                    ;
+                    if (event.putShadow(sfts.getEpochPair(sfts.E, sx.W))) {return true;}
                 } else {
-                    while (!event.putShadow(sfts.getEpochPlusCV(sx, r, rTid))) {
-                        event.putOriginalShadow(event.getShadow());
-                    }
+                    readShare.inc(tid);
+                        if (event.putShadow(sfts.getEpochPlusCV(sx, e))) {return true;}
                 }
             } else {
                 if (COUNT_OPERATIONS)
                     readShared.inc(tid);
-                while (!event.putShadow(((EpochPlusCV) sx).getNextEpcv(e))) {
-                    event.putOriginalShadow(event.getShadow());
-                }
+                if(event.putShadow(((EpochPlusCV) sx).getNextEpcv(e))) {return true;}
             }
-
+            return false;
         }
-
 
     }
 
     protected void write(final AccessEvent event, final ShadowThread st, final EpochPair sx) {
+        while(!try_write(event,st,sx)) {
+            event.putOriginalShadow(event.getShadow());
+        }
+    }
+
+    protected boolean try_write(final AccessEvent event, final ShadowThread st, final EpochPair sx) {
 
         final int/* epoch */ e = ts_get_sfts(st).E;
 
@@ -400,7 +404,7 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
             if (w == e) {
                 if (COUNT_OPERATIONS)
                     writeSameEpoch.inc(st.getTid());
-                return;
+                return true;
             }
         }
 
@@ -447,10 +451,10 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
                         writeShared.inc(tid);
                 }
             }
-            while (!event.putShadow(sfts.currentWriteEpoch)) {
-                event.putOriginalShadow(event.getShadow());
+            if (event.putShadow(sfts.currentWriteEpoch)) {
+                return true;
             }
-
+            return false;
         }
 
 
