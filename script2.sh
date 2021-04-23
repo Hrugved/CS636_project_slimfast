@@ -24,7 +24,7 @@ for d in */ ; do
     printf "%s : (FT2: %d/%d) (SF: %d/%d)\n" $d $ft2_t $ft2_d $sf_t $sf_d >> ../../output.txt
     cd ..
 done
-
+cd ..
 #printf '%s\n' "${ft2_arr[@]}"
 printf "\n\nDONE\n\n" >> output.txt
 printf '\n\nDONE\n\n'

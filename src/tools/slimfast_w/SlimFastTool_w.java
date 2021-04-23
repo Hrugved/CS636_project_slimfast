@@ -30,14 +30,13 @@
  *
  ******************************************************************************/
 
-package tools.slimfast;
+package tools.slimfast_w;
 
 import acme.util.Assert;
 import acme.util.Util;
 import acme.util.count.AggregateCounter;
 import acme.util.count.ThreadLocalCounter;
 import acme.util.decorations.Decoration;
-import acme.util.decorations.DecorationFactory;
 import acme.util.decorations.DecorationFactory.Type;
 import acme.util.decorations.DefaultValue;
 import acme.util.decorations.NullDefault;
@@ -50,38 +49,22 @@ import rr.barrier.BarrierListener;
 import rr.barrier.BarrierMonitor;
 import rr.error.ErrorMessage;
 import rr.error.ErrorMessages;
-import rr.event.AccessEvent;
+import rr.event.*;
 import rr.event.AccessEvent.Kind;
-import rr.event.AcquireEvent;
-import rr.event.ArrayAccessEvent;
-import rr.event.ClassAccessedEvent;
-import rr.event.ClassInitializedEvent;
-import rr.event.FieldAccessEvent;
-import rr.event.JoinEvent;
-import rr.event.NewThreadEvent;
-import rr.event.ReleaseEvent;
-import rr.event.StartEvent;
-import rr.event.VolatileAccessEvent;
-import rr.event.WaitEvent;
 import rr.instrument.classes.ArrayAllocSiteTracker;
-import rr.meta.ArrayAccessInfo;
-import rr.meta.ClassInfo;
-import rr.meta.FieldInfo;
-import rr.meta.MetaDataInfoMaps;
-import rr.meta.MethodInfo;
-import rr.meta.OperationInfo;
-import rr.meta.SourceLocation;
+import rr.meta.*;
 import rr.state.ShadowLock;
 import rr.state.ShadowThread;
 import rr.state.ShadowVar;
 import rr.state.ShadowVolatile;
 import rr.tool.RR;
 import rr.tool.Tool;
+import tools.fasttrack.FTVarState;
 import tools.util.Epoch;
 import tools.util.VectorClock;
 
-@Abbrev("SF")
-public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState> {
+@Abbrev("SF_w")
+public class SlimFastTool_w extends Tool implements BarrierListener<SFBarrierState> {
 
 
     private static final boolean COUNT_OPERATIONS = RRMain.slowMode();
@@ -106,7 +89,7 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
         }
     }
 
-    public SlimFastTool(final String name, final Tool next, CommandLine commandLine) {
+    public SlimFastTool_w(final String name, final Tool next, CommandLine commandLine) {
         super(name, next, commandLine);
         new BarrierMonitor<SFBarrierState>(this, new DefaultValue<Object, SFBarrierState>() {
             public SFBarrierState get(Object k) {
@@ -149,7 +132,7 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
     }
 
     static final Decoration<ShadowLock, SFLockState> lockVs = ShadowLock.makeDecoration(
-            "SlimFast:ShadowLock", DecorationFactory.Type.MULTIPLE,
+            "SlimFast:ShadowLock", Type.MULTIPLE,
             new DefaultValue<ShadowLock, SFLockState>() {
                 public SFLockState get(final ShadowLock lock) {
                     return new SFLockState(lock, INIT_VECTOR_CLOCK_SIZE);
@@ -162,7 +145,7 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
     }
 
     static final Decoration<ShadowVolatile, SFVolatileState> volatileVs = ShadowVolatile
-            .makeDecoration("SlimFast:shadowVolatile", DecorationFactory.Type.MULTIPLE,
+            .makeDecoration("SlimFast:shadowVolatile", Type.MULTIPLE,
                     new DefaultValue<ShadowVolatile, SFVolatileState>() {
                         public SFVolatileState get(final ShadowVolatile vol) {
                             return new SFVolatileState(vol, INIT_VECTOR_CLOCK_SIZE);
@@ -195,8 +178,6 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
 
     @Override
     public void create(NewThreadEvent event) {
-
-
         final ShadowThread st = event.getThread();
         final int tid = st.getTid();
         final SFThreadState sfts = new SFThreadState();
@@ -330,6 +311,7 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
                 wait, vol, other);
     }
 
+
     protected void read(final AccessEvent event, final ShadowThread st, final EpochPair sx) {
         while(!try_read(event,st,sx)) {
             event.putOriginalShadow(event.getShadow());
@@ -374,21 +356,27 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
                 if (rTid == tid || Epoch.leq(r, tV.get(rTid))) {
                     if (COUNT_OPERATIONS)
                         readExclusive.inc(tid);
+                    // EpochPair can be shared, hence immutable update
                     if (event.putShadow(sfts.getEpochPair(sfts.E, sx.W))) {return true;}
                 } else {
-                    if (COUNT_OPERATIONS)
-                        readShare.inc(tid);
+                    readShare.inc(tid);
                     if (event.putShadow(sfts.getEpochPlusCV(sx, e))) {return true;}
                 }
             } else {
                 if (COUNT_OPERATIONS)
                     readShared.inc(tid);
-                if(event.putShadow(((EpochPlusCV) sx).getNextEpcv(e))) {return true;}
+                // can be mutated, since epochPlusCV aren't shared
+                ((EpochPlusCV) sx).RVC.set(tid, e);
             }
             return false;
         }
 
     }
+
+    private void p(String s) {
+        System.out.println("\u001B[31m" + s + "\u001B[0m" + "\n");
+    }
+
 
     protected void write(final AccessEvent event, final ShadowThread st, final EpochPair sx) {
         while(!try_write(event,st,sx)) {
@@ -458,9 +446,7 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
             return false;
         }
 
-
     }
-
     @Override
     public void volatileAccess(final VolatileAccessEvent event) {
         final ShadowThread st = event.getThread();
@@ -553,7 +539,7 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
     }
 
     private final Decoration<ShadowThread, VectorClock> vectorClockForBarrierEntry = ShadowThread
-            .makeDecoration("FT:barrier", DecorationFactory.Type.MULTIPLE,
+            .makeDecoration("FT:barrier", Type.MULTIPLE,
                     new NullDefault<ShadowThread, VectorClock>());
 
     public void preDoBarrier(BarrierEvent<SFBarrierState> event) {

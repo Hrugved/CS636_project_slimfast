@@ -42,7 +42,7 @@ public class SFThreadState {
     }
 
     public EpochPair generateAndInsertNewEpochPairIntoCache(int/* epoch */ R, int/* epoch */ W) {
-        EpochPair ep = new EpochPair(Epoch.tid(E), Epoch.clock(R), Epoch.tid(W), Epoch.clock(W));
+        EpochPair ep = new EpochPair(Epoch.tid(R), Epoch.clock(R), Epoch.tid(W), Epoch.clock(W));
         if (EpochPairCacheCurrentSize < EpochPairCacheSize) EpochPairCacheCurrentSize++;
         // if overflow -> replace last entry
         EpochPairCache[EpochPairCacheCurrentSize - 1] = ep;
