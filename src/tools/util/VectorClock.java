@@ -33,6 +33,7 @@
 package tools.util;
 
 import java.io.Serializable;
+import java.util.Arrays;
 
 import acme.util.Assert;
 
@@ -41,8 +42,20 @@ import acme.util.Assert;
  *
  * The client is responsible for providing synchronization.
  */
+
+
 public class VectorClock implements Serializable {
     private static final int FAST = 8;
+
+    @Override
+    public int hashCode() {
+        return Arrays.hashCode(values);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        return this.hashCode() == obj.hashCode();
+    }
 
     protected volatile int/* epoch */[] values;
 

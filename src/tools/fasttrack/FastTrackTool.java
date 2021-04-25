@@ -37,6 +37,7 @@ import acme.util.Util;
 import acme.util.count.AggregateCounter;
 import acme.util.count.ThreadLocalCounter;
 import acme.util.decorations.Decoration;
+import acme.util.decorations.DecorationFactory;
 import acme.util.decorations.DecorationFactory.Type;
 import acme.util.decorations.DefaultValue;
 import acme.util.decorations.NullDefault;
@@ -302,7 +303,6 @@ public class FastTrackTool extends Tool implements BarrierListener<FTBarrierStat
 
             Object target = event.getTarget();
             if (target == null) {
-                // CS636: Static variable
                 ClassInfo owner = ((FieldAccessEvent) event).getInfo().getField().getOwner();
                 final VectorClock tV = ts_get_V(st);
                 synchronized (classInitTime) {

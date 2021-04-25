@@ -30,52 +30,31 @@
  *
  ******************************************************************************/
 
-package tools.fasttrack;
+package tools.fasttrack_r;
 
-import rr.state.ShadowVar;
-import tools.util.Epoch;
+import acme.util.Util;
+import rr.state.ShadowLock;
 import tools.util.VectorClock;
 
-public class FTVarState extends VectorClock implements ShadowVar {
-	// inherited values field:
-	// * if R != SHARED, then values and values[*] are protected by this.
-	// * if R == SHARED, then:
-	// - values is write-protected by this;
-	// - values[i] is write-protected by this;
-	// - values[i] is only written thread i.
-	// - values[i] is only read without the lock by thread i.
-	// Thus, once we become SHARED, only thread i updates
-	// values[i] and only thread i reads values[i] without holding
-	// the lock, so no races exist due to program order.
+public class FTLockState extends VectorClock {
 
-	// Write-protected by this => No concurrent writes when lock held.
-	public volatile int/* epoch */ W;
+    // inherited values field: protected by peer.getLock().
+    // That lock will be held during acquire/release/wait events.
 
-	// Write-protected by this => No concurrent writes when lock held.
-	// if R == Epoch.SHARED, it will never change again.
-	public volatile int/* epoch */ R;
+    private final ShadowLock peer;
 
-	protected FTVarState() {
-	}
+    public FTLockState(ShadowLock peer, int size) {
+        super(size);
+        this.peer = peer;
+    }
 
-	public FTVarState(boolean isWrite, int/* epoch */ epoch) {
-		if (isWrite) {
-			R = Epoch.ZERO;
-			W = epoch;
-		} else {
-			W = Epoch.ZERO;
-			R = epoch;
-		}
-	}
+    public ShadowLock getPeer() {
+        return peer;
+    }
 
-	@Override
-	public synchronized void makeCV(int len) {
-		super.makeCV(len);
-	}
+    @Override
+    public synchronized String toString() {
+        return String.format("[peer %s: %s]", Util.objectToIdentityString(peer), super.toString());
+    }
 
-	@Override
-	public synchronized String toString() {
-		return String.format("[W=%s R=%s V=%s]", Epoch.toString(W), Epoch.toString(R),
-				super.toString());
-	}
 }
