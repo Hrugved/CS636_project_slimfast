@@ -13,12 +13,12 @@ public class SFThreadState {
     /* other metadata for optimizations */
 
     // S_t
-    private static final int EpochPairCacheSize = 10;
+    private static final int EpochPairCacheSize = SlimFastTool.CACHE_SIZE;
     private int EpochPairCacheCurrentSize;
     private final EpochPair[] EpochPairCache = new EpochPair[EpochPairCacheSize];
 
     // Q_t
-    private static final int EpochPlusCVCacheSize = 10;
+    private static final int EpochPlusCVCacheSize = SlimFastTool.CACHE_SIZE;
     private int EpochPlusCVCacheCurrentSize;
     private final EpochPlusCV[] EpochPlusCVCache = new EpochPlusCV[EpochPlusCVCacheSize];
 

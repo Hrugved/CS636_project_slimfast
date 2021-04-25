@@ -12,7 +12,7 @@ public class SFThreadState {
     /* other metadata for optimizations */
 
     // S_t
-    private static final int EpochPairCacheSize = 10;
+    private static final int EpochPairCacheSize = 20;
     private int EpochPairCacheCurrentSize;
     private final EpochPair[] EpochPairCache = new EpochPair[EpochPairCacheSize];
 

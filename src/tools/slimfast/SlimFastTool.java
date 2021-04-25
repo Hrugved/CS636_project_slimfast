@@ -43,6 +43,7 @@ import acme.util.decorations.DefaultValue;
 import acme.util.decorations.NullDefault;
 import acme.util.io.XMLWriter;
 import acme.util.option.CommandLine;
+import acme.util.option.CommandLineOption;
 import rr.RRMain;
 import rr.annotations.Abbrev;
 import rr.barrier.BarrierEvent;
@@ -83,6 +84,16 @@ import tools.util.VectorClock;
 @Abbrev("SF")
 public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState> {
 
+    private static CommandLineOption<Integer> cacheSize =
+            CommandLine.makeInteger("cacheSize", 10, CommandLineOption.Kind.STABLE, "specify the cache size for epochpairs and epochPlusCV per thread");
+
+    public static int CACHE_SIZE;
+
+    @Override
+    public void init() {
+        super.init();
+        CACHE_SIZE=cacheSize.get();
+    }
 
     private static final boolean COUNT_OPERATIONS = RRMain.slowMode();
     public static final int INIT_VECTOR_CLOCK_SIZE = 4;
@@ -108,6 +119,7 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
 
     public SlimFastTool(final String name, final Tool next, CommandLine commandLine) {
         super(name, next, commandLine);
+        commandLine.add(SlimFastTool.cacheSize);
         new BarrierMonitor<SFBarrierState>(this, new DefaultValue<Object, SFBarrierState>() {
             public SFBarrierState get(Object k) {
                 return new SFBarrierState(k, INIT_VECTOR_CLOCK_SIZE);
@@ -667,6 +679,11 @@ public class SlimFastTool extends Tool implements BarrierListener<SFBarrierState
             advance(fae);
         }
     }
+
+        public void p(String s) {
+            System.out.println("\u001B[31m" + s + "\u001B[0m" + "\n");
+        }
+
 }
 
 

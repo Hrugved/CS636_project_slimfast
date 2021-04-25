@@ -373,11 +373,6 @@ public class SlimFastTool_w extends Tool implements BarrierListener<SFBarrierSta
 
     }
 
-    private void p(String s) {
-        System.out.println("\u001B[31m" + s + "\u001B[0m" + "\n");
-    }
-
-
     protected void write(final AccessEvent event, final ShadowThread st, final EpochPair sx) {
         while(!try_write(event,st,sx)) {
             event.putOriginalShadow(event.getShadow());
