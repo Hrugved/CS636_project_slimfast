@@ -802,18 +802,18 @@ public class FastTrackTool_r extends Tool implements BarrierListener<FTBarrierSt
             xml.print("thread", toString(td));
         }
 
-        xml.print("write epochs", writeEpochs.get());
-        xml.print("unique write epochs", writeEpochs_u.size());
-        xml.print("read epochs", readEpochs.get());
-        xml.print("unique read epochs", readEpochs_u.size());
-        xml.print("read vcs", readVcs.get());
-        xml.print("unique read vcs", readVcs_u.size());
-        xml.print("lock vcs", lockVcs.get());
-        xml.print("unique lock vcs", lockVcs_u.size());
-        xml.print("volatile vcs", volatileVcs.get());
-        xml.print("unique volatile vcs", volatileVcs_u.size());
+        xml.print("write_epochs", writeEpochs.get());
+        xml.print("unique_write_epochs", writeEpochs_u.size());
+        xml.print("read_epochs", readEpochs.get());
+        xml.print("unique_read_epochs", readEpochs_u.size());
+        xml.print("read_vcs", readVcs.get());
+        xml.print("unique_read_vcs", readVcs_u.size());
+        xml.print("lock_vcs", lockVcs.get());
+        xml.print("unique_lock_vcs", lockVcs_u.size());
+        xml.print("volatile_vcs", volatileVcs.get());
+        xml.print("unique_volatile_vcs", volatileVcs_u.size());
         xml.print("Redundancy", (
-                readEpochs.get()+writeEpochs.get()+readVcs.get()+lockVcs.get()+volatileVcs.get())
+                (float)readEpochs.get()+writeEpochs.get()+readVcs.get()+lockVcs.get()+volatileVcs.get())
                 /
                 (readEpochs_u.size()+writeEpochs_u.size()+readVcs_u.size()+lockVcs_u.size()+volatileVcs_u.size()));
     }
