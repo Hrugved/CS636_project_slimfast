@@ -7,3 +7,5 @@ Please change JAVA_HOME variable in ./msetup accordingly
 <code>ant</code><br>
 <code>cd benchmarks/avrora</code><br>
 <code>./Test -tool=SF</code><br>
+
+report: PROJECT_REPORT_180301.pdf
