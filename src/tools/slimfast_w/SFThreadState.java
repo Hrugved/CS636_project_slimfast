@@ -18,11 +18,11 @@ public class SFThreadState {
         return new EpochPair(Epoch.tid(E), Epoch.clock(R), Epoch.tid(W), Epoch.clock(W));
     }
 
-    public EpochPlusCV getEpochPlusCV(EpochPair prevEpochPair, int/* epoch */ newReadEpoch) {
-        EpochPlusCV epcv = new EpochPlusCV(prevEpochPair.W);
-        epcv.RVC.set(Epoch.tid(prevEpochPair.R), prevEpochPair.R);
-        epcv.RVC.set(Epoch.tid(newReadEpoch), newReadEpoch);
-        return epcv;
+    public EpochPlusVC getEpochPlusVC(EpochPair prevEpochPair, int/* epoch */ newReadEpoch) {
+        EpochPlusVC epvc = new EpochPlusVC(prevEpochPair.W);
+        epvc.RVC.set(Epoch.tid(prevEpochPair.R), prevEpochPair.R);
+        epvc.RVC.set(Epoch.tid(newReadEpoch), newReadEpoch);
+        return epvc;
     }
 
     public void refresh() {

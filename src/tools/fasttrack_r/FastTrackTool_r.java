@@ -86,6 +86,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Abbrev("FT2_r")
 public class FastTrackTool_r extends Tool implements BarrierListener<FTBarrierState> {
 
+    // Redundancy-related metadata
     private final static AtomicInteger readEpochs = new AtomicInteger(0);
     private final static AtomicInteger writeEpochs = new AtomicInteger(0);
     private final static AtomicInteger readVcs = new AtomicInteger(0);
@@ -802,20 +803,19 @@ public class FastTrackTool_r extends Tool implements BarrierListener<FTBarrierSt
             xml.print("thread", toString(td));
         }
 
-        xml.print("write_epochs", writeEpochs.get());
-        xml.print("unique_write_epochs", writeEpochs_u.size());
-        xml.print("read_epochs", readEpochs.get());
-        xml.print("unique_read_epochs", readEpochs_u.size());
-        xml.print("read_vcs", readVcs.get());
-        xml.print("unique_read_vcs", readVcs_u.size());
-        xml.print("lock_vcs", lockVcs.get());
-        xml.print("unique_lock_vcs", lockVcs_u.size());
-        xml.print("volatile_vcs", volatileVcs.get());
-        xml.print("unique_volatile_vcs", volatileVcs_u.size());
-        xml.print("Redundancy", (
+        xml.push("Redundancy");
+        xml.print("write_epochs",(float)writeEpochs.get()/writeEpochs_u.size());
+        xml.print("read_epochs",(float)readEpochs.get()/readEpochs_u.size());
+        xml.print("read_vcs",(readVcs.get()==0 ? 0 : (float)readVcs.get()/readVcs_u.size()));
+        xml.print("lock_vcs",(lockVcs.get()==0 ? 0 : (float)lockVcs.get()/lockVcs_u.size()));
+        xml.print("volatile_vcs",(volatileVcs.get()==0 ? 0 : (float)volatileVcs.get()/volatileVcs_u.size()));
+        xml.print("Total", (
                 (float)readEpochs.get()+writeEpochs.get()+readVcs.get()+lockVcs.get()+volatileVcs.get())
                 /
                 (readEpochs_u.size()+writeEpochs_u.size()+readVcs_u.size()+lockVcs_u.size()+volatileVcs_u.size()));
+        xml.pop();
+
+
     }
 
     protected void error(final AccessEvent ae, final FTVarState x, final String description,

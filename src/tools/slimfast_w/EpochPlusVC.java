@@ -5,18 +5,18 @@ import tools.util.Epoch;
 import tools.util.VectorClock;
 
 
-public class EpochPlusCV extends EpochPair implements ShadowVar {
+public class EpochPlusVC extends EpochPair implements ShadowVar {
 
     public VectorClock RVC = new VectorClock(SlimFastTool_w.INIT_VECTOR_CLOCK_SIZE);
 
-    public EpochPlusCV(int/* epoch */ W) {
+    public EpochPlusVC(int/* epoch */ W) {
         this.W = W;
         R = Epoch.READ_SHARED;
     }
 
-    public EpochPlusCV(EpochPlusCV epcv) {
-        this(epcv.W);
-        RVC.copy(epcv.RVC);
+    public EpochPlusVC(EpochPlusVC epvc) {
+        this(epvc.W);
+        RVC.copy(epvc.RVC);
     }
 
 }

@@ -106,7 +106,7 @@ public class SlimFastTool_w_ep extends Tool implements BarrierListener<SFBarrier
         Assert.panic("Bad");
     }
 
-    protected void maxAndIncEpochAndCV(ShadowThread st, VectorClock other, OperationInfo info) {
+    protected void maxAndIncEpochAndVC(ShadowThread st, VectorClock other, OperationInfo info) {
         final int tid = st.getTid();
         final SFThreadState sfts = ts_get_sfts(st);
         sfts.VC.max(other);
@@ -115,14 +115,14 @@ public class SlimFastTool_w_ep extends Tool implements BarrierListener<SFBarrier
         sfts.refresh();
     }
 
-    protected void maxEpochAndCV(ShadowThread st, VectorClock other, OperationInfo info) {
+    protected void maxEpochAndVC(ShadowThread st, VectorClock other, OperationInfo info) {
         final int tid = st.getTid();
         final SFThreadState sfts = ts_get_sfts(st);
         sfts.VC.max(other);
         sfts.E = sfts.VC.get(tid);
     }
 
-    protected void incEpochAndCV(ShadowThread st, OperationInfo info) {
+    protected void incEpochAndVC(ShadowThread st, OperationInfo info) {
         final int tid = st.getTid();
         final SFThreadState sfts = ts_get_sfts(st);
         sfts.VC.tick(tid);
@@ -183,7 +183,7 @@ public class SlimFastTool_w_ep extends Tool implements BarrierListener<SFBarrier
         ts_set_sfts(st, sfts);
         sfts.E = Epoch.make(tid, 0);
         sfts.VC.set(tid, sfts.E);
-        this.incEpochAndCV(st, null);
+        this.incEpochAndVC(st, null);
         Util.log("Initial E for " + tid + ": " + Epoch.toString(ts_get_sfts(st).E));
         super.create(event);
     }
@@ -193,7 +193,7 @@ public class SlimFastTool_w_ep extends Tool implements BarrierListener<SFBarrier
         final ShadowThread st = event.getThread();
         final SFLockState lockV = getV(event.getLock());
 
-        maxEpochAndCV(st, lockV, event.getInfo());
+        maxEpochAndVC(st, lockV, event.getInfo());
 
         super.acquire(event);
         if (COUNT_OPERATIONS)
@@ -207,7 +207,7 @@ public class SlimFastTool_w_ep extends Tool implements BarrierListener<SFBarrier
         final VectorClock lockV = getV(event.getLock());
 
         lockV.max(tV);
-        incEpochAndCV(st, event.getInfo());
+        incEpochAndVC(st, event.getInfo());
 
         super.release(event);
         if (COUNT_OPERATIONS)
@@ -244,7 +244,7 @@ public class SlimFastTool_w_ep extends Tool implements BarrierListener<SFBarrier
                 ClassInfo owner = ((FieldAccessEvent) event).getInfo().getField().getOwner();
                 synchronized (classInitTime) {
                     VectorClock initTime = classInitTime.get(owner);
-                    maxEpochAndCV(st, initTime, event.getAccessInfo());
+                    maxEpochAndVC(st, initTime, event.getAccessInfo());
                 }
             }
             if (event.isWrite()) {
@@ -327,7 +327,7 @@ public class SlimFastTool_w_ep extends Tool implements BarrierListener<SFBarrier
                 if (COUNT_OPERATIONS)
                     readSameEpoch.inc(st.getTid());
                 return true;
-            } else if ((r == Epoch.READ_SHARED) && (((EpochPlusCV) (sx)).RVC.get(st.getTid()) == e)) {
+            } else if ((r == Epoch.READ_SHARED) && (((EpochPlusVC) (sx)).RVC.get(st.getTid()) == e)) {
                 if (COUNT_OPERATIONS)
                     readSharedSameEpoch.inc(st.getTid());
                 return true;
@@ -359,13 +359,13 @@ public class SlimFastTool_w_ep extends Tool implements BarrierListener<SFBarrier
                     if (event.putShadow(sfts.getEpochPair(sfts.E, sx.W))) {return true;}
                 } else {
                     readShare.inc(tid);
-                    if (event.putShadow(sfts.getEpochPlusCV(sx, e))) {return true;}
+                    if (event.putShadow(sfts.getEpochPlusVC(sx, e))) {return true;}
                 }
             } else {
                 if (COUNT_OPERATIONS)
                     readShared.inc(tid);
-                // can be mutated, since epochPlusCV aren't shared
-                ((EpochPlusCV) sx).RVC.set(tid, e);
+                // can be mutated, since epochPlusVC aren't shared
+                ((EpochPlusVC) sx).RVC.set(tid, e);
             }
             return false;
         }
@@ -423,7 +423,7 @@ public class SlimFastTool_w_ep extends Tool implements BarrierListener<SFBarrier
                         writeExclusive.inc(tid);
                 }
             } else {
-                final EpochPlusCV sy = (EpochPlusCV) sx;
+                final EpochPlusVC sy = (EpochPlusVC) sx;
                 if (sy.RVC.anyGt(tV)) {
                     for (int prevReader = sy.RVC.nextGt(tV, 0); prevReader > -1; prevReader = sy.RVC
                             .nextGt(tV, prevReader + 1)) {
@@ -454,9 +454,9 @@ public class SlimFastTool_w_ep extends Tool implements BarrierListener<SFBarrier
         if (event.isWrite()) {
             final VectorClock tV = ts_get_sfts(st).VC;
             volV.max(tV);
-            incEpochAndCV(st, event.getAccessInfo());
+            incEpochAndVC(st, event.getAccessInfo());
         } else {
-            maxEpochAndCV(st, volV, event.getAccessInfo());
+            maxEpochAndVC(st, volV, event.getAccessInfo());
         }
 
         super.volatileAccess(event);
@@ -477,8 +477,8 @@ public class SlimFastTool_w_ep extends Tool implements BarrierListener<SFBarrier
          * second attempt to start u will crash... RR guarantees that the forked thread will
          * synchronize with thread t before it does anything else.
          */
-        maxAndIncEpochAndCV(su, tV, event.getInfo());
-        incEpochAndCV(st, event.getInfo());
+        maxAndIncEpochAndVC(su, tV, event.getInfo());
+        incEpochAndVC(st, event.getInfo());
 
         super.preStart(event);
         if (COUNT_OPERATIONS)
@@ -502,7 +502,7 @@ public class SlimFastTool_w_ep extends Tool implements BarrierListener<SFBarrier
         // lock is held and u is not running. Also, RR guarantees
         // this thread has sync'd with u.
 
-        maxEpochAndCV(st, ts_get_sfts(su).VC, event.getInfo());
+        maxEpochAndVC(st, ts_get_sfts(su).VC, event.getInfo());
         // no need to inc su's clock here -- that was just for
         // the proof in the original FastTrack rules.
 
@@ -516,7 +516,7 @@ public class SlimFastTool_w_ep extends Tool implements BarrierListener<SFBarrier
         final ShadowThread st = event.getThread();
         final VectorClock lockV = getV(event.getLock());
         lockV.max(ts_get_sfts(st).VC); // we hold lock, so no need to sync here...
-        incEpochAndCV(st, event.getInfo());
+        incEpochAndVC(st, event.getInfo());
         super.preWait(event);
         if (COUNT_OPERATIONS)
             wait.inc(st.getTid());
@@ -526,7 +526,7 @@ public class SlimFastTool_w_ep extends Tool implements BarrierListener<SFBarrier
     public void postWait(WaitEvent event) {
         final ShadowThread st = event.getThread();
         final VectorClock lockV = getV(event.getLock());
-        maxEpochAndCV(st, lockV, event.getInfo()); // we hold lock here
+        maxEpochAndVC(st, lockV, event.getInfo()); // we hold lock here
         super.postWait(event);
         if (COUNT_OPERATIONS)
             wait.inc(st.getTid());
@@ -559,7 +559,7 @@ public class SlimFastTool_w_ep extends Tool implements BarrierListener<SFBarrier
         synchronized (barrierObj) {
             final VectorClock barrierV = vectorClockForBarrierEntry.get(st);
             barrierObj.stopUsingOldVectorClock(barrierV);
-            maxAndIncEpochAndCV(st, barrierV, null);
+            maxAndIncEpochAndVC(st, barrierV, null);
         }
         if (COUNT_OPERATIONS)
             barrier.inc(st.getTid());
@@ -573,7 +573,7 @@ public class SlimFastTool_w_ep extends Tool implements BarrierListener<SFBarrier
             VectorClock initTime = classInitTime.get(event.getRRClass());
             initTime.copy(tV);
         }
-        incEpochAndCV(st, null);
+        incEpochAndVC(st, null);
         super.classInitialized(event);
         if (COUNT_OPERATIONS)
             other.inc(st.getTid());
@@ -584,7 +584,7 @@ public class SlimFastTool_w_ep extends Tool implements BarrierListener<SFBarrier
         final ShadowThread st = event.getThread();
         synchronized (classInitTime) {
             final VectorClock initTime = classInitTime.get(event.getRRClass());
-            maxEpochAndCV(st, initTime, null);
+            maxEpochAndVC(st, initTime, null);
         }
         if (COUNT_OPERATIONS)
             other.inc(st.getTid());

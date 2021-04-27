@@ -12,7 +12,7 @@ public class SFThreadState {
     /* other metadata for optimizations */
 
     // S_t
-    private static final int EpochPairCacheSize = 20;
+    private static final int EpochPairCacheSize = 15;
     private int EpochPairCacheCurrentSize;
     private final EpochPair[] EpochPairCache = new EpochPair[EpochPairCacheSize];
 
@@ -43,11 +43,11 @@ public class SFThreadState {
         return ep;
     }
 
-    public EpochPlusCV getEpochPlusCV(EpochPair prevEpochPair, int/* epoch */ newReadEpoch) {
-        EpochPlusCV epcv = new EpochPlusCV(prevEpochPair.W);
-        epcv.RVC.set(Epoch.tid(prevEpochPair.R), prevEpochPair.R);
-        epcv.RVC.set(Epoch.tid(newReadEpoch), newReadEpoch);
-        return epcv;
+    public EpochPlusVC getEpochPlusVC(EpochPair prevEpochPair, int/* epoch */ newReadEpoch) {
+        EpochPlusVC epvc = new EpochPlusVC(prevEpochPair.W);
+        epvc.RVC.set(Epoch.tid(prevEpochPair.R), prevEpochPair.R);
+        epvc.RVC.set(Epoch.tid(newReadEpoch), newReadEpoch);
+        return epvc;
     }
 
     public void refresh() {
